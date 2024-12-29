@@ -7,6 +7,5 @@ export const isKeyExpired = (expiresAt: string): boolean => {
 
 export const handleKeyExpiration = () => {
   clearVerifications();
-  // Remove the HWID reset since we don't want to allow new key generation
-  // localStorage.removeItem('hwid');
+  localStorage.removeItem('hwid');
 };
