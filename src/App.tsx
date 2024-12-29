@@ -5,10 +5,12 @@ import { CheckpointButtons } from './components/CheckpointButtons';
 import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
-import { isCheckpointVerified } from './utils/checkpointVerification';
+import { isCheckpointVerified, clearVerifications } from './utils/checkpointVerification';
 import { isKeyExpired, handleKeyExpiration } from './utils/keyExpiration';
 import { getCheckpointProgress } from './utils/checkpointProgress';
 import { Loader2 } from 'lucide-react';
+import { supabase } from './config/supabase';
+import { getHWID } from './utils/hwid';
 import type { CheckpointStatus, Key } from './types';
 
 export default function App() {
@@ -32,8 +34,7 @@ export default function App() {
     const checkpointNumber = validateCheckpoint(checkpointParam);
 
     if (checkpointNumber) {
-      const checkpointKey =
-        `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
+      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
       setCheckpoints((prev) => ({
         ...prev,
         [checkpointKey]: true,
@@ -80,16 +81,14 @@ export default function App() {
             },
             async (payload) => {
               if (payload.eventType === 'DELETE' || payload.eventType === 'UPDATE') {
-                const updatedKey = await getExistingValidKey();
-                setGeneratedKey(updatedKey);
-                if (!updatedKey) {
-                  // Reset checkpoints when key is deleted
-                  setCheckpoints({
-                    checkpoint1: false,
-                    checkpoint2: false,
-                    checkpoint3: false,
-                  });
-                }
+                setGeneratedKey(null);
+                clearVerifications();
+                setCheckpoints({
+                  checkpoint1: false,
+                  checkpoint2: false,
+                  checkpoint3: false,
+                });
+                setCaptchaVerified(false);
               }
             }
           )
@@ -109,25 +108,20 @@ export default function App() {
     initializeApp();
   }, []);
 
-  // Handle key generation when all checkpoints are completed
-  useEffect(() => {
-    const generateKeyIfNeeded = async () => {
-      if (allCheckpointsCompleted && !generatedKey && !generating) {
-        setGenerating(true);
-        try {
-          const newKey = await generateKey();
-          setGeneratedKey(newKey);
-        } catch (error) {
-          console.error('Error generating key:', error);
-          setError('Failed to generate key. Please try again.');
-        } finally {
-          setGenerating(false);
-        }
+  const handleGenerateKey = async () => {
+    if (allCheckpointsCompleted && !generatedKey && !generating) {
+      setGenerating(true);
+      try {
+        const newKey = await generateKey();
+        setGeneratedKey(newKey);
+      } catch (error) {
+        console.error('Error generating key:', error);
+        setError('Failed to generate key. Please try again.');
+      } finally {
+        setGenerating(false);
       }
-    };
-
-    generateKeyIfNeeded();
-  }, [allCheckpointsCompleted, generatedKey, generating]);
+    }
+  };
 
   const onCaptchaVerify = () => {
     setCaptchaVerified(true);
@@ -181,7 +175,17 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <CheckpointButtons checkpoints={checkpoints} />
+                <>
+                  <CheckpointButtons checkpoints={checkpoints} />
+                  {allCheckpointsCompleted && (
+                    <button
+                      onClick={handleGenerateKey}
+                      className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+                    >
+                      Generate Key
+                    </button>
+                  )}
+                </>
               )}
             </>
           )}
