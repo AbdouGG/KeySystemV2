@@ -32,7 +32,8 @@ export default function App() {
     const checkpointNumber = validateCheckpoint(checkpointParam);
 
     if (checkpointNumber) {
-      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
+      const checkpointKey =
+        `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
       setCheckpoints((prev) => ({
         ...prev,
         [checkpointKey]: true,
@@ -52,7 +53,7 @@ export default function App() {
 
         if (existingKey) {
           if (isKeyExpired(existingKey.expires_at)) {
-            await handleKeyExpiration(existingKey.id);
+            handleKeyExpiration();
             return; // The page will reload from clearVerifications
           }
           setGeneratedKey(existingKey);
