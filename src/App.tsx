@@ -24,7 +24,80 @@ export default function App() {
 
   const allCheckpointsCompleted = Object.values(checkpoints).every(Boolean);
 
-  // Previous useEffect hooks remain the same...
+  // Handle Linkvertise redirect and verify checkpoints
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkpointParam = params.get(REDIRECT_PARAM);
+    const checkpointNumber = validateCheckpoint(checkpointParam);
+
+    if (checkpointNumber) {
+      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
+      setCheckpoints((prev) => ({
+        ...prev,
+        [checkpointKey]: true,
+      }));
+
+      // Clean up URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
+  // Initialize app state
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const existingKey = await getExistingValidKey();
+        
+        if (existingKey) {
+          if (isKeyExpired(existingKey.expires_at)) {
+            handleKeyExpiration();
+          } else {
+            setGeneratedKey(existingKey);
+          }
+        }
+
+        // Load checkpoint verifications
+        const newCheckpoints = {
+          checkpoint1: isCheckpointVerified(1),
+          checkpoint2: isCheckpointVerified(2),
+          checkpoint3: isCheckpointVerified(3),
+        };
+        setCheckpoints(newCheckpoints);
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        setError('Failed to load key system. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
+  // Handle key generation when all checkpoints are completed
+  useEffect(() => {
+    const generateKeyIfNeeded = async () => {
+      if (allCheckpointsCompleted && !generatedKey && !generating) {
+        setGenerating(true);
+        try {
+          const newKey = await generateKey();
+          setGeneratedKey(newKey);
+        } catch (error) {
+          console.error('Error generating key:', error);
+          setError('Failed to generate key. Please try again.');
+        } finally {
+          setGenerating(false);
+        }
+      }
+    };
+
+    generateKeyIfNeeded();
+  }, [allCheckpointsCompleted, generatedKey, generating]);
+
+  const onCaptchaVerify = () => {
+    setCaptchaVerified(true);
+  };
 
   if (loading) {
     return (
@@ -99,14 +172,6 @@ export default function App() {
           )}
 
           {generatedKey && <KeyDisplay keyData={generatedKey} />}
-
-          {allCheckpointsCompleted && !generatedKey && !generating && (
-            <div className="mt-6 text-center">
-              <p className="text-green-400 mb-2">
-                All checkpoints completed! Your key is being generated...
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>
