@@ -6,7 +6,7 @@ import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
 import { isCheckpointVerified } from './utils/checkpointVerification';
-import { isKeyExpired, handleKeyExpiration } from './utils/keyExpiration';
+import { isKeyExpired, handleKeyExpiration, startExpirationCheck } from './utils/keyExpiration';
 import { getCheckpointProgress } from './utils/checkpointProgress';
 import { resetCheckpoints } from './utils/checkpointManager';
 import { Loader2 } from 'lucide-react';
@@ -26,52 +26,23 @@ export default function App() {
 
   const allCheckpointsCompleted = Object.values(checkpoints).every(Boolean);
 
-  // Initialize checkpoints and check existing key
+  // Initialize expiration checker
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        // Check for existing key first
-        const existingKey = await getExistingValidKey();
-
-        if (existingKey) {
-          if (isKeyExpired(existingKey.expires_at)) {
-            handleKeyExpiration();
-            setGeneratedKey(null);
-            setCheckpoints(resetCheckpoints());
-            setCaptchaVerified(false);
-          } else {
-            setGeneratedKey(existingKey);
-          }
-        }
-
-        // Initialize checkpoints
-        const newCheckpoints = {
-          checkpoint1: isCheckpointVerified(1),
-          checkpoint2: isCheckpointVerified(2),
-          checkpoint3: isCheckpointVerified(3),
-        };
-        setCheckpoints(newCheckpoints);
-      } catch (error) {
-        console.error('Error initializing app:', error);
-        setError('Failed to initialize the key system. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeApp();
+    const cleanup = startExpirationCheck();
+    return () => cleanup();
   }, []);
 
-  // Handle Linkvertise redirect
+  // Handle Linkvertise redirect and verify checkpoints
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkpointParam = params.get(REDIRECT_PARAM);
     const checkpointNumber = validateCheckpoint(checkpointParam);
 
     if (checkpointNumber) {
+      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
       setCheckpoints((prev) => ({
         ...prev,
-        [`checkpoint${checkpointNumber}`]: true,
+        [checkpointKey]: true,
       }));
 
       // Clean up URL
@@ -80,10 +51,47 @@ export default function App() {
     }
   }, []);
 
+  // Initialize app state
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const existingKey = await getExistingValidKey();
+
+        if (existingKey) {
+          if (isKeyExpired(existingKey.expires_at)) {
+            await handleKeyExpiration();
+            setGeneratedKey(null);
+            setCheckpoints(resetCheckpoints());
+            setCaptchaVerified(false);
+          } else {
+            setGeneratedKey(existingKey);
+          }
+        }
+
+        // Only load checkpoint verifications if we have a valid key
+        if (existingKey && !isKeyExpired(existingKey.expires_at)) {
+          const newCheckpoints = {
+            checkpoint1: isCheckpointVerified(1),
+            checkpoint2: isCheckpointVerified(2),
+            checkpoint3: isCheckpointVerified(3),
+          };
+          setCheckpoints(newCheckpoints);
+        }
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        setError('Failed to load key system. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
   // Handle key generation when all checkpoints are completed
   useEffect(() => {
     const generateKeyIfNeeded = async () => {
-      if (allCheckpointsCompleted && !generatedKey && !generating && captchaVerified) {
+      if (allCheckpointsCompleted && !generatedKey && !generating) {
         setGenerating(true);
         try {
           const newKey = await generateKey();
@@ -98,7 +106,7 @@ export default function App() {
     };
 
     generateKeyIfNeeded();
-  }, [allCheckpointsCompleted, generatedKey, generating, captchaVerified]);
+  }, [allCheckpointsCompleted, generatedKey, generating]);
 
   const onCaptchaVerify = () => {
     setCaptchaVerified(true);
