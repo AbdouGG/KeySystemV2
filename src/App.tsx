@@ -48,12 +48,11 @@ export default function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const existingKey = await getExistingValidKey();
+        // Check if there's a valid key
         const isValid = await checkKeyStatus();
+        const existingKey = await getExistingValidKey();
 
-        if (existingKey && isValid) {
-          setGeneratedKey(existingKey);
-        } else {
+        if (!isValid || !existingKey) {
           // Reset everything if key is invalid or doesn't exist
           setGeneratedKey(null);
           clearVerifications();
@@ -63,12 +62,11 @@ export default function App() {
             checkpoint3: false,
           });
           if (existingKey) {
-            setError('Your key is no longer valid. Please complete the checkpoints again.');
+            setError('Your key has expired. Please complete the checkpoints again.');
           }
-        }
-
-        // Only load checkpoint verifications if we have a valid key
-        if (isValid) {
+        } else {
+          setGeneratedKey(existingKey);
+          // Load checkpoint verifications only if we have a valid key
           const newCheckpoints = {
             checkpoint1: isCheckpointVerified(1),
             checkpoint2: isCheckpointVerified(2),
@@ -87,7 +85,7 @@ export default function App() {
     initializeApp();
   }, []);
 
-  // Add key status check interval
+  // Check key status periodically
   useEffect(() => {
     const checkInterval = setInterval(async () => {
       if (generatedKey) {
@@ -100,7 +98,7 @@ export default function App() {
             checkpoint2: false,
             checkpoint3: false,
           });
-          setError('Your key is no longer valid. Please complete the checkpoints again.');
+          setError('Your key has expired. Please complete the checkpoints again.');
         }
       }
     }, 60000); // Check every minute
@@ -108,7 +106,7 @@ export default function App() {
     return () => clearInterval(checkInterval);
   }, [generatedKey]);
 
-  // Handle key generation when all checkpoints are completed
+  // Handle key generation
   useEffect(() => {
     const generateKeyIfNeeded = async () => {
       if (allCheckpointsCompleted && !generatedKey && !generating) {
