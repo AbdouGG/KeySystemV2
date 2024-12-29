@@ -5,8 +5,8 @@ import { CheckpointButtons } from './components/CheckpointButtons';
 import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
-import { isCheckpointVerified, clearVerifications } from './utils/checkpointVerification';
-import { checkKeyStatus } from './utils/keyExpiration';
+import { isCheckpointVerified } from './utils/checkpointVerification';
+import { isKeyExpired, handleKeyExpiration } from './utils/keyExpiration';
 import { getCheckpointProgress } from './utils/checkpointProgress';
 import { Loader2 } from 'lucide-react';
 import type { CheckpointStatus, Key } from './types';
@@ -32,7 +32,8 @@ export default function App() {
     const checkpointNumber = validateCheckpoint(checkpointParam);
 
     if (checkpointNumber) {
-      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
+      const checkpointKey =
+        `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
       setCheckpoints((prev) => ({
         ...prev,
         [checkpointKey]: true,
@@ -44,36 +45,59 @@ export default function App() {
     }
   }, []);
 
-  // Initialize app state
+  // Initialize app state and set up real-time subscription
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Check if there's a valid key
-        const isValid = await checkKeyStatus();
         const existingKey = await getExistingValidKey();
 
-        if (!isValid || !existingKey) {
-          // Reset everything if key is invalid or doesn't exist
-          setGeneratedKey(null);
-          clearVerifications();
-          setCheckpoints({
-            checkpoint1: false,
-            checkpoint2: false,
-            checkpoint3: false,
-          });
-          if (existingKey) {
-            setError('Your key has expired. Please complete the checkpoints again.');
+        if (existingKey) {
+          if (isKeyExpired(existingKey.expires_at)) {
+            handleKeyExpiration();
+          } else {
+            setGeneratedKey(existingKey);
           }
-        } else {
-          setGeneratedKey(existingKey);
-          // Load checkpoint verifications only if we have a valid key
-          const newCheckpoints = {
-            checkpoint1: isCheckpointVerified(1),
-            checkpoint2: isCheckpointVerified(2),
-            checkpoint3: isCheckpointVerified(3),
-          };
-          setCheckpoints(newCheckpoints);
         }
+
+        // Load checkpoint verifications
+        const newCheckpoints = {
+          checkpoint1: isCheckpointVerified(1),
+          checkpoint2: isCheckpointVerified(2),
+          checkpoint3: isCheckpointVerified(3),
+        };
+        setCheckpoints(newCheckpoints);
+
+        // Set up real-time subscription for key deletions
+        const subscription = supabase
+          .channel('key-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'keys',
+              filter: `hwid=eq.${getHWID()}`,
+            },
+            async (payload) => {
+              if (payload.eventType === 'DELETE' || payload.eventType === 'UPDATE') {
+                const updatedKey = await getExistingValidKey();
+                setGeneratedKey(updatedKey);
+                if (!updatedKey) {
+                  // Reset checkpoints when key is deleted
+                  setCheckpoints({
+                    checkpoint1: false,
+                    checkpoint2: false,
+                    checkpoint3: false,
+                  });
+                }
+              }
+            }
+          )
+          .subscribe();
+
+        return () => {
+          subscription.unsubscribe();
+        };
       } catch (error) {
         console.error('Error initializing app:', error);
         setError('Failed to load key system. Please try again.');
@@ -85,28 +109,7 @@ export default function App() {
     initializeApp();
   }, []);
 
-  // Check key status periodically
-  useEffect(() => {
-    const checkInterval = setInterval(async () => {
-      if (generatedKey) {
-        const isValid = await checkKeyStatus();
-        if (!isValid) {
-          setGeneratedKey(null);
-          clearVerifications();
-          setCheckpoints({
-            checkpoint1: false,
-            checkpoint2: false,
-            checkpoint3: false,
-          });
-          setError('Your key has expired. Please complete the checkpoints again.');
-        }
-      }
-    }, 60000); // Check every minute
-
-    return () => clearInterval(checkInterval);
-  }, [generatedKey]);
-
-  // Handle key generation
+  // Handle key generation when all checkpoints are completed
   useEffect(() => {
     const generateKeyIfNeeded = async () => {
       if (allCheckpointsCompleted && !generatedKey && !generating) {
@@ -114,17 +117,9 @@ export default function App() {
         try {
           const newKey = await generateKey();
           setGeneratedKey(newKey);
-          setError(null);
         } catch (error) {
           console.error('Error generating key:', error);
           setError('Failed to generate key. Please try again.');
-          // Reset checkpoints if key generation fails
-          clearVerifications();
-          setCheckpoints({
-            checkpoint1: false,
-            checkpoint2: false,
-            checkpoint3: false,
-          });
         } finally {
           setGenerating(false);
         }

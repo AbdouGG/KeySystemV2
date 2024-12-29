@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { getHWID } from './hwid';
+import { clearVerifications } from './checkpointVerification';
 import type { Key } from '../types';
 
 export const getExistingValidKey = async (): Promise<Key | null> => {
@@ -15,5 +16,12 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
     .limit(1);
 
   if (error) throw error;
-  return existingKeys && existingKeys.length > 0 ? existingKeys[0] : null;
+
+  // If no valid key is found, clear the checkpoints
+  if (!existingKeys || existingKeys.length === 0) {
+    clearVerifications();
+    return null;
+  }
+
+  return existingKeys[0];
 };
