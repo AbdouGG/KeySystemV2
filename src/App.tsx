@@ -54,9 +54,15 @@ export default function App() {
         if (existingKey) {
           if (isKeyExpired(existingKey.expires_at)) {
             handleKeyExpiration();
-            return; // The page will reload from clearVerifications
+            setGeneratedKey(null);
+            setCheckpoints({
+              checkpoint1: false,
+              checkpoint2: false,
+              checkpoint3: false,
+            });
+          } else {
+            setGeneratedKey(existingKey);
           }
-          setGeneratedKey(existingKey);
         }
 
         // Load checkpoint verifications
