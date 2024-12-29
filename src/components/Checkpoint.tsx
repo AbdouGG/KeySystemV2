@@ -25,7 +25,8 @@ export const Checkpoint: React.FC<CheckpointProps> = ({
       console.log(`Opening linkvertise for checkpoint ${number}`);
       const linkUrl = createLinkvertiseUrl(number);
       window.open(linkUrl, '_blank');
-      onComplete(); // Call onComplete to update the state
+      // Remove automatic completion
+      // onComplete will be called only after successful verification
     } else {
       console.log(`Checkpoint ${number} is disabled`);
     }
