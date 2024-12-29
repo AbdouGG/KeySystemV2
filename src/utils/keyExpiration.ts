@@ -8,7 +8,7 @@ export const isKeyExpired = (expiresAt: string): boolean => {
   return expirationDate.getTime() <= Date.now();
 };
 
-export const handleKeyExpiration = async () => {
+export const handleKeyExpiration = async (): Promise<void> => {
   try {
     const hwid = getHWID();
     
@@ -21,6 +21,7 @@ export const handleKeyExpiration = async () => {
 
     if (error) {
       console.error('Error invalidating expired keys:', error);
+      return;
     }
 
     // Clear local storage
@@ -29,34 +30,30 @@ export const handleKeyExpiration = async () => {
     
     // Reset checkpoints
     resetCheckpoints();
-    
-    // Force reload to reset the UI state
-    window.location.reload();
   } catch (error) {
     console.error('Error handling key expiration:', error);
   }
 };
 
 // Function to check and clean up expired keys periodically
-export const startExpirationCheck = () => {
+export const startExpirationCheck = (): (() => void) => {
   const checkExpiration = async () => {
     try {
       const hwid = getHWID();
       
-      // Get current valid key
-      const { data: keys, error } = await supabase
+      const { data: key, error } = await supabase
         .from('keys')
-        .select('*')
+        .select()
         .eq('hwid', hwid)
         .eq('is_valid', true)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error checking key expiration:', error);
         return;
       }
 
-      if (keys && isKeyExpired(keys.expires_at)) {
+      if (key && isKeyExpired(key.expires_at)) {
         await handleKeyExpiration();
       }
     } catch (error) {
@@ -70,5 +67,6 @@ export const startExpirationCheck = () => {
   // Initial check
   checkExpiration();
 
+  // Return cleanup function
   return () => clearInterval(interval);
 };

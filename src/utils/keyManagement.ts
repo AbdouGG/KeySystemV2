@@ -10,17 +10,22 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
 
     const { data: existingKeys, error } = await supabase
       .from('keys')
-      .select('*')
+      .select()
       .eq('hwid', hwid)
       .eq('is_valid', true)
       .gte('expires_at', now.toISOString())
       .limit(1);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Database error:', error);
+      return null;
+    }
 
-    if (!existingKeys?.length) return null;
+    if (!existingKeys || existingKeys.length === 0) {
+      return null;
+    }
 
-    const key = existingKeys[0];
+    const key = existingKeys[0] as Key;
     
     // Check if key is expired
     if (new Date(key.expires_at) <= now) {
@@ -35,7 +40,7 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
   }
 };
 
-export const invalidateExpiredKeys = async () => {
+export const invalidateExpiredKeys = async (): Promise<void> => {
   try {
     const { error } = await supabase
       .from('keys')
