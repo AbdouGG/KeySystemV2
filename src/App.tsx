@@ -5,6 +5,7 @@ import { KeyDisplay } from './components/KeyDisplay';
 import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
+import { isCheckpointVerified } from './utils/checkpointVerification';
 import type { CheckpointStatus, Key } from './types';
 
 export default function App() {
@@ -17,7 +18,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Handle Linkvertise redirect
+  // Handle Linkvertise redirect and verify checkpoints
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkpointParam = params.get(REDIRECT_PARAM);
@@ -25,10 +26,12 @@ export default function App() {
 
     if (checkpointNumber) {
       const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
-      setCheckpoints(prev => ({
-        ...prev,
-        [checkpointKey]: true
-      }));
+      if (isCheckpointVerified(checkpointNumber)) {
+        setCheckpoints(prev => ({
+          ...prev,
+          [checkpointKey]: true
+        }));
+      }
 
       // Clean up URL
       const newUrl = window.location.pathname;
@@ -36,67 +39,39 @@ export default function App() {
     }
   }, []);
 
-  // Check for existing valid key on mount
+  // Check for existing valid key and load verified checkpoints on mount
   useEffect(() => {
-    const checkExistingKey = async () => {
+    const initializeApp = async () => {
       try {
         const existingKey = await getExistingValidKey();
         if (existingKey) {
           setGeneratedKey(existingKey);
-          setCheckpoints({
-            checkpoint1: false,
-            checkpoint2: false,
-            checkpoint3: false,
-          });
-          localStorage.removeItem('checkpoints');
+        } else {
+          const newCheckpoints = {
+            checkpoint1: isCheckpointVerified(1),
+            checkpoint2: isCheckpointVerified(2),
+            checkpoint3: isCheckpointVerified(3)
+          };
+          setCheckpoints(newCheckpoints);
         }
       } catch (error) {
-        console.error('Error checking existing key:', error);
+        console.error('Error initializing app:', error);
+        setError('Failed to load key system. Please try again.');
       } finally {
         setLoading(false);
       }
     };
 
-    checkExistingKey();
+    initializeApp();
   }, []);
 
-  // Load saved checkpoints on mount
-  useEffect(() => {
-    if (!generatedKey) {
-      const savedCheckpoints = localStorage.getItem('checkpoints');
-      if (savedCheckpoints) {
-        try {
-          const parsed = JSON.parse(savedCheckpoints);
-          setCheckpoints(prev => ({
-            ...prev,
-            ...parsed
-          }));
-        } catch (e) {
-          console.error('Error parsing saved checkpoints:', e);
-        }
-      }
-    }
-  }, [generatedKey]);
-
-  // Save checkpoints when they change
-  useEffect(() => {
-    if (!generatedKey) {
-      localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
-    }
-  }, [checkpoints, generatedKey]);
-
-  const handleCheckpointComplete = async (
-    checkpoint: keyof CheckpointStatus
-  ) => {
+  const handleCheckpointComplete = async (checkpoint: keyof CheckpointStatus) => {
     // Verify sequential completion
     if (checkpoint === 'checkpoint2' && !checkpoints.checkpoint1) {
       setError('Please complete Checkpoint 1 first');
       return;
     }
-    if (
-      checkpoint === 'checkpoint3' &&
-      (!checkpoints.checkpoint1 || !checkpoints.checkpoint2)
-    ) {
+    if (checkpoint === 'checkpoint3' && (!checkpoints.checkpoint1 || !checkpoints.checkpoint2)) {
       setError('Please complete previous checkpoints first');
       return;
     }
@@ -106,11 +81,11 @@ export default function App() {
     setCheckpoints(newCheckpoints);
 
     // If all checkpoints are complete, generate key
-    if (Object.values(newCheckpoints).every((status) => status)) {
+    if (Object.values(newCheckpoints).every(status => status)) {
       try {
+        setLoading(true);
         const key = await generateKey();
         setGeneratedKey(key);
-        localStorage.removeItem('checkpoints');
       } catch (error) {
         if (error instanceof Error) {
           setError(error.message);
@@ -118,6 +93,8 @@ export default function App() {
           setError('Error generating key');
         }
         console.error('Error generating key:', error);
+      } finally {
+        setLoading(false);
       }
     }
   };
