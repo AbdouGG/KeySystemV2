@@ -21,8 +21,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [captchaVerified, setCaptchaVerified] = useState(false);
 
-  const allCheckpointsCompleted = Object.values(checkpoints).every(Boolean);
-
   // Handle Linkvertise redirect and verify checkpoints
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -80,6 +78,10 @@ export default function App() {
     setCaptchaVerified(true);
   };
 
+  const handleKeyGenerated = (key: Key) => {
+    setGeneratedKey(key);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
@@ -121,7 +123,10 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <CheckpointButtons checkpoints={checkpoints} />
+                <CheckpointButtons 
+                  checkpoints={checkpoints} 
+                  onKeyGenerated={handleKeyGenerated}
+                />
               )}
             </>
           )}

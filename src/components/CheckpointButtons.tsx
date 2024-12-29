@@ -1,6 +1,8 @@
 import React from 'react';
 import { getCurrentCheckpoint } from '../utils/checkpointProgress';
 import { createLinkvertiseUrl } from '../utils/linkvertiseHandler';
+import { generateKey } from '../utils/keyGeneration';
+import { Key } from '../types';
 
 interface CheckpointButtonsProps {
   checkpoints: {
@@ -8,16 +10,41 @@ interface CheckpointButtonsProps {
     checkpoint2: boolean;
     checkpoint3: boolean;
   };
+  onKeyGenerated: (key: Key) => void;
 }
 
-export const CheckpointButtons: React.FC<CheckpointButtonsProps> = ({ checkpoints }) => {
+export const CheckpointButtons: React.FC<CheckpointButtonsProps> = ({
+  checkpoints,
+  onKeyGenerated,
+}) => {
   const currentCheckpoint = getCurrentCheckpoint(checkpoints);
+  const allCompleted = !currentCheckpoint;
 
   const handleLinkvertise = () => {
     if (!currentCheckpoint) return;
     const linkUrl = createLinkvertiseUrl(currentCheckpoint);
     window.open(linkUrl, '_blank');
   };
+
+  const handleGenerateKey = async () => {
+    try {
+      const key = await generateKey();
+      onKeyGenerated(key);
+    } catch (error) {
+      console.error('Failed to generate key:', error);
+    }
+  };
+
+  if (allCompleted) {
+    return (
+      <button
+        onClick={handleGenerateKey}
+        className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+      >
+        Generate Key
+      </button>
+    );
+  }
 
   return (
     <div className="space-y-4">
