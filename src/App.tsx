@@ -7,7 +7,7 @@ import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
 import type { CheckpointStatus, Key } from './types';
 
-function App() {
+export default function App() {
   const [checkpoints, setCheckpoints] = useState<CheckpointStatus>({
     checkpoint1: false,
     checkpoint2: false,
