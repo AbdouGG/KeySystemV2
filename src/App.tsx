@@ -26,29 +26,11 @@ export default function App() {
 
   const allCheckpointsCompleted = Object.values(checkpoints).every(Boolean);
 
-  // Handle Linkvertise redirect and verify checkpoints
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkpointParam = params.get(REDIRECT_PARAM);
-    const checkpointNumber = validateCheckpoint(checkpointParam);
-
-    if (checkpointNumber) {
-      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
-      setCheckpoints((prev) => ({
-        ...prev,
-        [checkpointKey]: true,
-      }));
-
-      // Clean up URL
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-    }
-  }, []);
-
-  // Initialize app state
+  // Initialize checkpoints and check existing key
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Check for existing key first
         const existingKey = await getExistingValidKey();
 
         if (existingKey) {
@@ -62,18 +44,16 @@ export default function App() {
           }
         }
 
-        // Only load checkpoint verifications if we have a valid key
-        if (existingKey && !isKeyExpired(existingKey.expires_at)) {
-          const newCheckpoints = {
-            checkpoint1: isCheckpointVerified(1),
-            checkpoint2: isCheckpointVerified(2),
-            checkpoint3: isCheckpointVerified(3),
-          };
-          setCheckpoints(newCheckpoints);
-        }
+        // Initialize checkpoints
+        const newCheckpoints = {
+          checkpoint1: isCheckpointVerified(1),
+          checkpoint2: isCheckpointVerified(2),
+          checkpoint3: isCheckpointVerified(3),
+        };
+        setCheckpoints(newCheckpoints);
       } catch (error) {
         console.error('Error initializing app:', error);
-        setError('Failed to load key system. Please try again.');
+        setError('Failed to initialize the key system. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -82,10 +62,28 @@ export default function App() {
     initializeApp();
   }, []);
 
+  // Handle Linkvertise redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkpointParam = params.get(REDIRECT_PARAM);
+    const checkpointNumber = validateCheckpoint(checkpointParam);
+
+    if (checkpointNumber) {
+      setCheckpoints((prev) => ({
+        ...prev,
+        [`checkpoint${checkpointNumber}`]: true,
+      }));
+
+      // Clean up URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
   // Handle key generation when all checkpoints are completed
   useEffect(() => {
     const generateKeyIfNeeded = async () => {
-      if (allCheckpointsCompleted && !generatedKey && !generating) {
+      if (allCheckpointsCompleted && !generatedKey && !generating && captchaVerified) {
         setGenerating(true);
         try {
           const newKey = await generateKey();
@@ -100,7 +98,7 @@ export default function App() {
     };
 
     generateKeyIfNeeded();
-  }, [allCheckpointsCompleted, generatedKey, generating]);
+  }, [allCheckpointsCompleted, generatedKey, generating, captchaVerified]);
 
   const onCaptchaVerify = () => {
     setCaptchaVerified(true);
