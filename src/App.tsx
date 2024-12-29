@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { KeyDisplay } from './components/KeyDisplay';
 import { CheckpointButtons } from './components/CheckpointButtons';
-import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
 import { isCheckpointVerified } from './utils/checkpointVerification';
@@ -20,7 +19,6 @@ export default function App() {
   const [generatedKey, setGeneratedKey] = useState<Key | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
   const [captchaVerified, setCaptchaVerified] = useState(false);
 
   const allCheckpointsCompleted = Object.values(checkpoints).every(Boolean);
@@ -54,6 +52,7 @@ export default function App() {
         if (existingKey) {
           if (isKeyExpired(existingKey.expires_at)) {
             handleKeyExpiration();
+            setGeneratedKey(null);
           } else {
             setGeneratedKey(existingKey);
           }
@@ -76,26 +75,6 @@ export default function App() {
 
     initializeApp();
   }, []);
-
-  // Handle key generation when all checkpoints are completed
-  useEffect(() => {
-    const generateKeyIfNeeded = async () => {
-      if (allCheckpointsCompleted && !generatedKey && !generating) {
-        setGenerating(true);
-        try {
-          const newKey = await generateKey();
-          setGeneratedKey(newKey);
-        } catch (error) {
-          console.error('Error generating key:', error);
-          setError('Failed to generate key. Please try again.');
-        } finally {
-          setGenerating(false);
-        }
-      }
-    };
-
-    generateKeyIfNeeded();
-  }, [allCheckpointsCompleted, generatedKey, generating]);
 
   const onCaptchaVerify = () => {
     setCaptchaVerified(true);
@@ -129,14 +108,7 @@ export default function App() {
             </div>
           )}
 
-          {generating && (
-            <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto mb-4" />
-              <p className="text-gray-400">Generating your key...</p>
-            </div>
-          )}
-
-          {!generatedKey && !generating && (
+          {!generatedKey && (
             <>
               {!captchaVerified ? (
                 <div className="space-y-6">
