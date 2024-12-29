@@ -8,6 +8,7 @@ import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
 import { isCheckpointVerified } from './utils/checkpointVerification';
 import { isKeyExpired, handleKeyExpiration } from './utils/keyExpiration';
 import { getCheckpointProgress } from './utils/checkpointProgress';
+import { resetCheckpoints } from './utils/checkpointManager';
 import { Loader2 } from 'lucide-react';
 import type { CheckpointStatus, Key } from './types';
 
@@ -32,8 +33,7 @@ export default function App() {
     const checkpointNumber = validateCheckpoint(checkpointParam);
 
     if (checkpointNumber) {
-      const checkpointKey =
-        `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
+      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
       setCheckpoints((prev) => ({
         ...prev,
         [checkpointKey]: true,
@@ -55,23 +55,22 @@ export default function App() {
           if (isKeyExpired(existingKey.expires_at)) {
             handleKeyExpiration();
             setGeneratedKey(null);
-            setCheckpoints({
-              checkpoint1: false,
-              checkpoint2: false,
-              checkpoint3: false,
-            });
+            setCheckpoints(resetCheckpoints());
+            setCaptchaVerified(false);
           } else {
             setGeneratedKey(existingKey);
           }
         }
 
-        // Load checkpoint verifications
-        const newCheckpoints = {
-          checkpoint1: isCheckpointVerified(1),
-          checkpoint2: isCheckpointVerified(2),
-          checkpoint3: isCheckpointVerified(3),
-        };
-        setCheckpoints(newCheckpoints);
+        // Only load checkpoint verifications if we have a valid key
+        if (existingKey && !isKeyExpired(existingKey.expires_at)) {
+          const newCheckpoints = {
+            checkpoint1: isCheckpointVerified(1),
+            checkpoint2: isCheckpointVerified(2),
+            checkpoint3: isCheckpointVerified(3),
+          };
+          setCheckpoints(newCheckpoints);
+        }
       } catch (error) {
         console.error('Error initializing app:', error);
         setError('Failed to load key system. Please try again.');
