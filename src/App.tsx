@@ -17,7 +17,10 @@ export default function App() {
   const [generatedKey, setGeneratedKey] = useState<Key | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [captchaVerified, setCaptchaVerified] = useState(false);
+
+  const allCheckpointsCompleted = Object.values(checkpoints).every(Boolean);
 
   // Handle Linkvertise redirect and verify checkpoints
   useEffect(() => {
@@ -66,6 +69,27 @@ export default function App() {
     initializeApp();
   }, []);
 
+  // Auto-generate key when all checkpoints are completed
+  useEffect(() => {
+    const generateKeyIfCompleted = async () => {
+      if (allCheckpointsCompleted && !generatedKey && !generating && captchaVerified) {
+        try {
+          setGenerating(true);
+          setError(null);
+          const newKey = await generateKey();
+          setGeneratedKey(newKey);
+        } catch (error) {
+          console.error('Error generating key:', error);
+          setError('Failed to generate key. Please try again.');
+        } finally {
+          setGenerating(false);
+        }
+      }
+    };
+
+    generateKeyIfCompleted();
+  }, [allCheckpointsCompleted, generatedKey, generating, captchaVerified]);
+
   const onCaptchaVerify = (token: string) => {
     setCaptchaVerified(true);
   };
@@ -76,6 +100,17 @@ export default function App() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
           <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (generating) {
+    return (
+      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Generating your key...</p>
         </div>
       </div>
     );
@@ -118,17 +153,13 @@ export default function App() {
               >
                 Continue with Linkvertise
               </button>
-              <button
-                className="w-full bg-[#9146ff] hover:bg-[#8134ff] text-white font-medium py-3 px-4 rounded-lg transition-colors"
-              >
+              <button className="w-full bg-[#9146ff] hover:bg-[#8134ff] text-white font-medium py-3 px-4 rounded-lg transition-colors">
                 Continue with Lootlabs
               </button>
             </div>
           )}
 
-          {generatedKey && (
-            <KeyDisplay keyData={generatedKey} />
-          )}
+          {generatedKey && <KeyDisplay keyData={generatedKey} />}
         </div>
       </div>
     </div>
