@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
-import { Checkpoint } from './components/Checkpoint';
 import { KeyDisplay } from './components/KeyDisplay';
+import { CheckpointButtons } from './components/CheckpointButtons';
 import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
 import { isCheckpointVerified } from './utils/checkpointVerification';
 import { isKeyExpired, handleKeyExpiration } from './utils/keyExpiration';
+import { getCheckpointProgress } from './utils/checkpointProgress';
 import { Loader2 } from 'lucide-react';
 import type { CheckpointStatus, Key } from './types';
 
@@ -117,7 +118,7 @@ export default function App() {
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-red-500 mb-2">Key system</h1>
             <p className="text-gray-400">
-              Checkpoint: {Object.values(checkpoints).filter(Boolean).length} / 3
+              Checkpoint: {getCheckpointProgress(checkpoints)} / 3
             </p>
           </div>
 
@@ -147,26 +148,7 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <Checkpoint
-                    number={1}
-                    completed={checkpoints.checkpoint1}
-                    onComplete={() => {}}
-                    disabled={false}
-                  />
-                  <Checkpoint
-                    number={2}
-                    completed={checkpoints.checkpoint2}
-                    onComplete={() => {}}
-                    disabled={!checkpoints.checkpoint1}
-                  />
-                  <Checkpoint
-                    number={3}
-                    completed={checkpoints.checkpoint3}
-                    onComplete={() => {}}
-                    disabled={!checkpoints.checkpoint2}
-                  />
-                </div>
+                <CheckpointButtons checkpoints={checkpoints} />
               )}
             </>
           )}
