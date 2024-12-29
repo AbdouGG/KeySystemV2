@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyRound, ArrowRight, Lock } from 'lucide-react';
+import { KeyRound, ArrowRight, Lock, Check } from 'lucide-react';
 import { createLinkvertiseUrl } from '../utils/linkvertiseHandler';
 
 interface CheckpointProps {
@@ -16,9 +16,18 @@ export const Checkpoint: React.FC<CheckpointProps> = ({
   disabled,
 }) => {
   const handleClick = () => {
-    if (!completed && !disabled) {
+    if (completed) {
+      console.log(`Checkpoint ${number} already completed`);
+      return;
+    }
+    
+    if (!disabled) {
+      console.log(`Opening linkvertise for checkpoint ${number}`);
       const linkUrl = createLinkvertiseUrl(number);
       window.open(linkUrl, '_blank');
+      onComplete(); // Call onComplete to update the state
+    } else {
+      console.log(`Checkpoint ${number} is disabled`);
     }
   };
 
@@ -45,7 +54,9 @@ export const Checkpoint: React.FC<CheckpointProps> = ({
                 : 'bg-blue-500'
             }`}
           >
-            {disabled ? (
+            {completed ? (
+              <Check className="w-6 h-6 text-white" />
+            ) : disabled ? (
               <Lock className="w-6 h-6 text-white" />
             ) : (
               <KeyRound className="w-6 h-6 text-white" />
