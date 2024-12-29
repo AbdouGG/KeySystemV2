@@ -5,8 +5,8 @@ import { CheckpointButtons } from './components/CheckpointButtons';
 import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
-import { isCheckpointVerified } from './utils/checkpointVerification';
-import { checkKeyStatus, handleKeyExpiration } from './utils/keyExpiration';
+import { isCheckpointVerified, clearVerifications } from './utils/checkpointVerification';
+import { checkKeyStatus } from './utils/keyExpiration';
 import { getCheckpointProgress } from './utils/checkpointProgress';
 import { Loader2 } from 'lucide-react';
 import type { CheckpointStatus, Key } from './types';
@@ -49,24 +49,33 @@ export default function App() {
     const initializeApp = async () => {
       try {
         const existingKey = await getExistingValidKey();
+        const isValid = await checkKeyStatus();
 
-        if (existingKey) {
-          const isValid = await checkKeyStatus();
-          if (!isValid) {
-            await handleKeyExpiration();
-            setError('Your key has expired. Please complete the checkpoints again.');
-          } else {
-            setGeneratedKey(existingKey);
+        if (existingKey && isValid) {
+          setGeneratedKey(existingKey);
+        } else {
+          // Reset everything if key is invalid or doesn't exist
+          setGeneratedKey(null);
+          clearVerifications();
+          setCheckpoints({
+            checkpoint1: false,
+            checkpoint2: false,
+            checkpoint3: false,
+          });
+          if (existingKey) {
+            setError('Your key is no longer valid. Please complete the checkpoints again.');
           }
         }
 
-        // Load checkpoint verifications
-        const newCheckpoints = {
-          checkpoint1: isCheckpointVerified(1),
-          checkpoint2: isCheckpointVerified(2),
-          checkpoint3: isCheckpointVerified(3),
-        };
-        setCheckpoints(newCheckpoints);
+        // Only load checkpoint verifications if we have a valid key
+        if (isValid) {
+          const newCheckpoints = {
+            checkpoint1: isCheckpointVerified(1),
+            checkpoint2: isCheckpointVerified(2),
+            checkpoint3: isCheckpointVerified(3),
+          };
+          setCheckpoints(newCheckpoints);
+        }
       } catch (error) {
         console.error('Error initializing app:', error);
         setError('Failed to load key system. Please try again.');
@@ -85,12 +94,13 @@ export default function App() {
         const isValid = await checkKeyStatus();
         if (!isValid) {
           setGeneratedKey(null);
+          clearVerifications();
           setCheckpoints({
             checkpoint1: false,
             checkpoint2: false,
             checkpoint3: false,
           });
-          setError('Your key has expired. Please complete the checkpoints again.');
+          setError('Your key is no longer valid. Please complete the checkpoints again.');
         }
       }
     }, 60000); // Check every minute
@@ -110,6 +120,13 @@ export default function App() {
         } catch (error) {
           console.error('Error generating key:', error);
           setError('Failed to generate key. Please try again.');
+          // Reset checkpoints if key generation fails
+          clearVerifications();
+          setCheckpoints({
+            checkpoint1: false,
+            checkpoint2: false,
+            checkpoint3: false,
+          });
         } finally {
           setGenerating(false);
         }
