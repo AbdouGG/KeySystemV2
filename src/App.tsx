@@ -4,7 +4,7 @@ import { Checkpoint } from './components/Checkpoint';
 import { KeyDisplay } from './components/KeyDisplay';
 import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
-import { REDIRECT_PARAM } from './utils/linkvertiseHandler';
+import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
 import type { CheckpointStatus, Key } from './types';
 
 function App() {
@@ -20,11 +20,15 @@ function App() {
   // Handle Linkvertise redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const checkpoint = params.get(REDIRECT_PARAM);
+    const checkpointParam = params.get(REDIRECT_PARAM);
+    const checkpointNumber = validateCheckpoint(checkpointParam);
 
-    if (checkpoint) {
-      const checkpointKey = `checkpoint${checkpoint}` as keyof CheckpointStatus;
-      handleCheckpointComplete(checkpointKey);
+    if (checkpointNumber) {
+      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
+      setCheckpoints(prev => ({
+        ...prev,
+        [checkpointKey]: true
+      }));
 
       // Clean up URL
       const newUrl = window.location.pathname;
@@ -56,17 +60,25 @@ function App() {
     checkExistingKey();
   }, []);
 
-  // Reset checkpoints on page load if no valid key exists
+  // Load saved checkpoints on mount
   useEffect(() => {
     if (!generatedKey) {
       const savedCheckpoints = localStorage.getItem('checkpoints');
       if (savedCheckpoints) {
-        setCheckpoints(JSON.parse(savedCheckpoints));
+        try {
+          const parsed = JSON.parse(savedCheckpoints);
+          setCheckpoints(prev => ({
+            ...prev,
+            ...parsed
+          }));
+        } catch (e) {
+          console.error('Error parsing saved checkpoints:', e);
+        }
       }
     }
   }, [generatedKey]);
 
-  // Save checkpoints to localStorage when they change
+  // Save checkpoints when they change
   useEffect(() => {
     if (!generatedKey) {
       localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
@@ -170,5 +182,3 @@ function App() {
     </div>
   );
 }
-
-export default App;

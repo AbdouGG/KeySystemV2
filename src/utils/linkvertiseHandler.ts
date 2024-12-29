@@ -10,7 +10,13 @@ export const createLinkvertiseUrl = (checkpointNumber: number): string => {
   // Encode the return URL to ensure it works with Linkvertise
   const returnUrl = encodeURIComponent(createReturnUrl(checkpointNumber));
   
-  // For link-center.net, you need to set up the destination URL in their dashboard
-  // Make sure the destination URL matches your Netlify domain
-  return `${baseUrl}`;
+  return baseUrl;
+};
+
+// Helper function to validate checkpoint parameter
+export const validateCheckpoint = (param: string | null): number | null => {
+  if (!param) return null;
+  const num = parseInt(param, 10);
+  if (isNaN(num) || num < 1 || num > 3) return null;
+  return num;
 };
