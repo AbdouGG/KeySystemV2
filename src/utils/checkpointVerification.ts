@@ -17,6 +17,8 @@ export const getVerifications = (): Record<
 
 export const clearVerifications = () => {
   localStorage.removeItem(VERIFICATION_STORAGE_KEY);
+  // Force a page reload to ensure UI state is reset
+  window.location.reload();
 };
 
 export const saveVerification = (checkpoint: number) => {
