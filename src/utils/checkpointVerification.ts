@@ -8,59 +8,36 @@ export interface CheckpointVerificationResult {
 }
 
 export const getVerifications = (): Record<string, CheckpointVerificationResult> => {
-  try {
-    const stored = localStorage.getItem(VERIFICATION_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : {};
-  } catch (error) {
-    console.error('Error reading verifications:', error);
-    return {};
-  }
+  const stored = localStorage.getItem(VERIFICATION_STORAGE_KEY);
+  return stored ? JSON.parse(stored) : {};
 };
 
 export const clearVerifications = () => {
-  try {
-    localStorage.removeItem(VERIFICATION_STORAGE_KEY);
-    console.log('Verifications cleared successfully');
-  } catch (error) {
-    console.error('Error clearing verifications:', error);
-  }
+  localStorage.removeItem(VERIFICATION_STORAGE_KEY);
 };
 
 export const saveVerification = (checkpoint: number) => {
-  try {
-    const verifications = getVerifications();
-    verifications[`checkpoint${checkpoint}`] = {
-      success: true,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem(VERIFICATION_STORAGE_KEY, JSON.stringify(verifications));
-    console.log(`Checkpoint ${checkpoint} verified and saved`);
-  } catch (error) {
-    console.error('Error saving verification:', error);
-  }
+  const verifications = getVerifications();
+  const checkpointKey = `checkpoint${checkpoint}`;
+  
+  verifications[checkpointKey] = {
+    success: true,
+    timestamp: Date.now(),
+  };
+  
+  localStorage.setItem(VERIFICATION_STORAGE_KEY, JSON.stringify(verifications));
 };
 
 export const isCheckpointVerified = (checkpoint: number): boolean => {
-  try {
-    const verifications = getVerifications();
-    const verification = verifications[`checkpoint${checkpoint}`];
+  const verifications = getVerifications();
+  const checkpointKey = `checkpoint${checkpoint}`;
+  const verification = verifications[checkpointKey];
 
-    if (!verification) {
-      console.log(`Checkpoint ${checkpoint} not found in verifications`);
-      return false;
-    }
+  if (!verification) return false;
 
-    const expirationTime = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-    const hasExpired = Date.now() - verification.timestamp > expirationTime;
+  // 24 hours in milliseconds
+  const expirationTime = 24 * 60 * 60 * 1000;
+  const hasExpired = Date.now() - verification.timestamp > expirationTime;
 
-    if (hasExpired) {
-      console.log(`Checkpoint ${checkpoint} has expired`);
-      return false;
-    }
-
-    return verification.success;
-  } catch (error) {
-    console.error('Error checking verification:', error);
-    return false;
-  }
+  return verification.success && !hasExpired;
 };
