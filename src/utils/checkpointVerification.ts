@@ -17,13 +17,12 @@ export const getVerifications = (): Record<
 
 export const clearVerifications = () => {
   localStorage.removeItem(VERIFICATION_STORAGE_KEY);
-  // Force a page reload to ensure UI state is reset
-  window.location.reload();
 };
 
 export const saveVerification = (checkpoint: number) => {
   const verifications = getVerifications();
-  verifications[`checkpoint${checkpoint}`] = {
+  const key = `checkpoint${checkpoint}`;
+  verifications[key] = {
     success: true,
     timestamp: Date.now(),
   };
@@ -32,12 +31,22 @@ export const saveVerification = (checkpoint: number) => {
 
 export const isCheckpointVerified = (checkpoint: number): boolean => {
   const verifications = getVerifications();
-  const verification = verifications[`checkpoint${checkpoint}`];
+  const key = `checkpoint${checkpoint}`;
+  const verification = verifications[key];
 
   if (!verification) return false;
 
-  const expirationTime = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  // Increased expiration time to 48 hours to prevent early expiration
+  const expirationTime = 48 * 60 * 60 * 1000; // 48 hours in milliseconds
   const hasExpired = Date.now() - verification.timestamp > expirationTime;
 
-  return verification.success && !hasExpired;
+  if (hasExpired) {
+    // Remove expired verification
+    const updatedVerifications = { ...verifications };
+    delete updatedVerifications[key];
+    localStorage.setItem(VERIFICATION_STORAGE_KEY, JSON.stringify(updatedVerifications));
+    return false;
+  }
+
+  return verification.success;
 };
