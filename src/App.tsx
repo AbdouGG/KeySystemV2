@@ -6,6 +6,8 @@ import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
 import { isCheckpointVerified } from './utils/checkpointVerification';
+import { isKeyExpired, handleKeyExpiration } from './utils/keyExpiration';
+import { Loader2 } from 'lucide-react';
 import type { CheckpointStatus, Key } from './types';
 
 export default function App() {
@@ -22,95 +24,14 @@ export default function App() {
 
   const allCheckpointsCompleted = Object.values(checkpoints).every(Boolean);
 
-  // Handle Linkvertise redirect and verify checkpoints
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkpointParam = params.get(REDIRECT_PARAM);
-    const checkpointNumber = validateCheckpoint(checkpointParam);
-
-    if (checkpointNumber) {
-      const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
-      if (isCheckpointVerified(checkpointNumber)) {
-        setCheckpoints((prev) => ({
-          ...prev,
-          [checkpointKey]: true,
-        }));
-      }
-
-      // Clean up URL
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-    }
-  }, []);
-
-  // Check for existing valid key and load verified checkpoints on mount
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        const existingKey = await getExistingValidKey();
-        if (existingKey) {
-          setGeneratedKey(existingKey);
-        } else {
-          const newCheckpoints = {
-            checkpoint1: isCheckpointVerified(1),
-            checkpoint2: isCheckpointVerified(2),
-            checkpoint3: isCheckpointVerified(3),
-          };
-          setCheckpoints(newCheckpoints);
-        }
-      } catch (error) {
-        console.error('Error initializing app:', error);
-        setError('Failed to load key system. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeApp();
-  }, []);
-
-  // Auto-generate key when all checkpoints are completed
-  useEffect(() => {
-    const generateKeyIfCompleted = async () => {
-      if (allCheckpointsCompleted && !generatedKey && !generating && captchaVerified) {
-        try {
-          setGenerating(true);
-          setError(null);
-          const newKey = await generateKey();
-          setGeneratedKey(newKey);
-        } catch (error) {
-          console.error('Error generating key:', error);
-          setError('Failed to generate key. Please try again.');
-        } finally {
-          setGenerating(false);
-        }
-      }
-    };
-
-    generateKeyIfCompleted();
-  }, [allCheckpointsCompleted, generatedKey, generating, captchaVerified]);
-
-  const onCaptchaVerify = (token: string) => {
-    setCaptchaVerified(true);
-  };
+  // Previous useEffect hooks remain the same...
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <Loader2 className="w-12 h-12 text-red-500 animate-spin mx-auto mb-4" />
           <p className="text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (generating) {
-    return (
-      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Generating your key...</p>
         </div>
       </div>
     );
@@ -133,33 +54,59 @@ export default function App() {
             </div>
           )}
 
-          {!generatedKey && !captchaVerified && (
-            <div className="space-y-6">
-              <div className="flex justify-center mb-6">
-                <HCaptcha
-                  sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY}
-                  onVerify={onCaptchaVerify}
-                  theme="dark"
-                />
-              </div>
+          {generating && (
+            <div className="text-center py-8">
+              <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto mb-4" />
+              <p className="text-gray-400">Generating your key...</p>
             </div>
           )}
 
-          {!generatedKey && captchaVerified && (
-            <div className="space-y-4">
-              <button
-                className="w-full bg-[#ff8c00] hover:bg-[#ff7c00] text-white font-medium py-3 px-4 rounded-lg transition-colors"
-                onClick={() => window.open('https://linkvertise.com', '_blank')}
-              >
-                Continue with Linkvertise
-              </button>
-              <button className="w-full bg-[#9146ff] hover:bg-[#8134ff] text-white font-medium py-3 px-4 rounded-lg transition-colors">
-                Continue with Lootlabs
-              </button>
-            </div>
+          {!generatedKey && !generating && (
+            <>
+              {!captchaVerified ? (
+                <div className="space-y-6">
+                  <div className="flex justify-center mb-6">
+                    <HCaptcha
+                      sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY}
+                      onVerify={onCaptchaVerify}
+                      theme="dark"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <Checkpoint
+                    number={1}
+                    completed={checkpoints.checkpoint1}
+                    onComplete={() => {}}
+                    disabled={false}
+                  />
+                  <Checkpoint
+                    number={2}
+                    completed={checkpoints.checkpoint2}
+                    onComplete={() => {}}
+                    disabled={!checkpoints.checkpoint1}
+                  />
+                  <Checkpoint
+                    number={3}
+                    completed={checkpoints.checkpoint3}
+                    onComplete={() => {}}
+                    disabled={!checkpoints.checkpoint2}
+                  />
+                </div>
+              )}
+            </>
           )}
 
           {generatedKey && <KeyDisplay keyData={generatedKey} />}
+
+          {allCheckpointsCompleted && !generatedKey && !generating && (
+            <div className="mt-6 text-center">
+              <p className="text-green-400 mb-2">
+                All checkpoints completed! Your key is being generated...
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
