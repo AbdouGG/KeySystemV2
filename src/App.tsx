@@ -6,7 +6,7 @@ import { generateKey } from './utils/keyGeneration';
 import { getExistingValidKey } from './utils/keyManagement';
 import { REDIRECT_PARAM, validateCheckpoint } from './utils/linkvertiseHandler';
 import { isCheckpointVerified } from './utils/checkpointVerification';
-import { isKeyExpired, handleKeyExpiration } from './utils/keyExpiration';
+import { checkKeyStatus, handleKeyExpiration } from './utils/keyExpiration';
 import { getCheckpointProgress } from './utils/checkpointProgress';
 import { Loader2 } from 'lucide-react';
 import type { CheckpointStatus, Key } from './types';
@@ -49,10 +49,12 @@ export default function App() {
     const initializeApp = async () => {
       try {
         const existingKey = await getExistingValidKey();
-        
+
         if (existingKey) {
-          if (isKeyExpired(existingKey.expires_at)) {
-            handleKeyExpiration();
+          const isValid = await checkKeyStatus();
+          if (!isValid) {
+            await handleKeyExpiration();
+            setError('Your key has expired. Please complete the checkpoints again.');
           } else {
             setGeneratedKey(existingKey);
           }
@@ -76,6 +78,26 @@ export default function App() {
     initializeApp();
   }, []);
 
+  // Add key status check interval
+  useEffect(() => {
+    const checkInterval = setInterval(async () => {
+      if (generatedKey) {
+        const isValid = await checkKeyStatus();
+        if (!isValid) {
+          setGeneratedKey(null);
+          setCheckpoints({
+            checkpoint1: false,
+            checkpoint2: false,
+            checkpoint3: false,
+          });
+          setError('Your key has expired. Please complete the checkpoints again.');
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(checkInterval);
+  }, [generatedKey]);
+
   // Handle key generation when all checkpoints are completed
   useEffect(() => {
     const generateKeyIfNeeded = async () => {
@@ -84,6 +106,7 @@ export default function App() {
         try {
           const newKey = await generateKey();
           setGeneratedKey(newKey);
+          setError(null);
         } catch (error) {
           console.error('Error generating key:', error);
           setError('Failed to generate key. Please try again.');
